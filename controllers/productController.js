@@ -1,23 +1,22 @@
-const User=require("../models/userModel")
-const Products=require("../models/product")
-const Category=require("../models/category")
-const Brand=require("../models/brands")
-const sharp=require("sharp")
+const User = require("../models/userModel")
+const Products = require("../models/product")
+const Category = require("../models/category")
+const Brand = require("../models/brands")
+const sharp = require("sharp")
 const path = require('path');
+
 
 //ADMIN
 const loadProducts = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     try {
-        
         const totalProducts = await Products.find({}).countDocuments();
-        const totalPages = Math.ceil(totalProducts / 8);
-        const products = await Products.find({}).skip((page - 1) * 8).limit(8);
-        res.render("products", {
+        const totalPages = totalProducts / totalProducts;
+        const products = await Products.find({})
+        res.status(200).json({
             products: products,
             currentPage: page,
             totalPages: totalPages,
-            
         });
     } catch (error) {
         console.error(error.message);
@@ -40,19 +39,26 @@ const loadAddProduct = async (req, res) => {
 
 
 
+
 const addProduct = async (req, res) => {
     try {
-        const colors = req.body.prodcolor.split(",");
-        const sizes = req.body.sizes;
-        const stocks = req.body.stocks;
+        console.log(req.body)
+        console.log(req.files)
+        const colors = req.body.prodcolor ? req.body.prodcolor.split(",") : [];
+        const sizes = req.body.sizes || [];
+        const stocks = req.body.stocks || [];
         const sizeObjects = [];
+        console.log(sizes);
+        console.log(stocks);
+
         for (let i = 0; i < sizes.length; i++) {
             const sizeObject = {
                 size: sizes[i],
-                stock: parseInt(stocks[i]) || 0 
+                stock: parseInt(stocks[i]) || 0,
             };
             sizeObjects.push(sizeObject);
         }
+
         const prodDate = new Date();
         let product = new Products({
             productName: req.body.prodname,
@@ -61,39 +67,45 @@ const addProduct = async (req, res) => {
             sizes: sizeObjects,
             brand: req.body.prodbrand,
             category: req.body.prodcategory,
-            regularPrice: req.body.prodregprice,
-            salePrice: req.body.prodsprice,
-            offerPrice:(req.body.prodregprice)-(req.body.prodsprice),
+            regularPrice: parseInt(req.body.prodregprice),
+            salePrice: parseInt(req.body.prodsprice),
+            offerPrice: parseInt(req.body.prodregprice) - parseInt(req.body.prodsprice),
             images: [],
             gender: req.body.gender,
-            createdOn: prodDate
+            createdOn: prodDate,
         });
+        console.log(product);
+
         for (let file of req.files) {
-            const filepath=file.path
-                const randomInteger = Math.floor(Math.random() * 20000001);
-                const imageDirectory = path.join(__dirname,"../public/admin/assets/imgs/products");
-                let imgFileName = "cropped" + randomInteger + ".jpg";
-                let imagePath = path.join(imageDirectory, imgFileName);
-                const croppedImage = await sharp(filepath)
-                    .resize(780, 1000, {
-                        fit: "fill",
-                    })
-                    .toFile(imagePath);
+            const filepath = file.path;
+            const randomInteger = Math.floor(Math.random() * 20000001);
+            const imageDirectory = path.join(__dirname, "../public/admin/assets/imgs/products");
+            let imgFileName = "cropped" + randomInteger + ".jpg";
+            let imagePath = path.join(imageDirectory, imgFileName);
+
+            const croppedImage = await sharp(filepath)
+                .resize(780, 1000, {
+                    fit: "fill",
+                })
+                .toFile(imagePath);
+
             if (croppedImage) {
-                product.images.push({url:imgFileName})
+                product.images.push({ url: imgFileName });
             }
         }
+
         const category = await Category.find({});
         const brands = await Brand.find({});
         const productData = await product.save();
+
         if (productData) {
-            res.status(200).render("addProduct", { success: "Product Added", category: category, brand: brands });
+            return res.status(200).json({ status: 'success', message: 'Product Added', product: productData });
         } else {
-            res.status(500).render("addProduct", { message: "Something went wrong", category: category, brand: brands });
+            return res.status(500).json({ status: 'error', message: 'Something went wrong' });
         }
     } catch (error) {
         console.error(error.message);
-        res.status(500).render("error", { message: "Internal Server Error" });
+        res.status(500).json({ status: 'error', message: 'Internal Server Error' });
     }
 };
 
@@ -106,10 +118,11 @@ const loadEditProduct = async (req, res) => {
         const brands = await Brand.find({});
         const productId = req.query.productId;
         const product = await Products.findById(productId);
+        console.log(product)
         if (!product) {
-            return res.status(404).render('error', { message: 'Product not found' });
+            return res.status(404).json({ message: 'Product not found' });
         }
-        res.render('editProduct', { product: product, category: category, brand: brands });
+        res.status(200).json({ product: product });
     } catch (error) {
         console.error(error.message);
         res.status(500).render('error', { message: 'Internal Server Error' });
@@ -128,7 +141,7 @@ const deleteImage = async (req, res) => {
         }
         product.images = product.images.filter(image => image._id.toString() !== imgId);
         await product.save();
-        res.redirect(`/admin/products/edit?productId=${product._id}`);
+        res.redirect(`/admin/products / edit ? productId = ${ product._id }`);
     } catch (error) {
         console.error(error.message);
         res.status(500).render('error', { message: 'Internal Server Error' });
@@ -139,59 +152,11 @@ const deleteImage = async (req, res) => {
 
 
 
-// const updateProduct = async (req, res) => {
-//     try {
-//         const newimages = req.files.map(file => {
-//             return { url: file.filename };
-//         });
-//         const colors = req.body.prodcolor.split(",");
-//         const sizes = req.body.sizes;
-//         const stocks = req.body.stocks;
-//         const sizeObjects = [];
-//         for (let i = 0; i < sizes.length; i++) {
-//             const sizeObject = {
-//             size: sizes[i],
-//             stock: parseInt(stocks[i]) || 0 
-//             };
-//             sizeObjects.push(sizeObject);
-//         }
-//         const id = req.body.id;
-
-//         const existingProduct=await Products.findOne({_id:id})
-//         existingProduct.images=[...existingProduct.images,...newimages]
-//         const product = await Products.updateOne(
-//             { _id: id },
-//             {
-//                 $set: {
-//                     productName: req.body.prodname,
-//                     description: req.body.proddesc,
-//                     color: colors,
-//                     sizes: sizeObjects,
-//                     brand: req.body.prodbrand,
-//                     category: req.body.prodcategory,
-//                     regularPrice: req.body.prodregprice,
-//                     salePrice: req.body.prodsprice,
-//                     images: existingProduct.images,
-//                     gender:req.body.gender,
-//                 }
-//             }
-//         );
-
-
-//         if (product.modifiedCount>0) {
-//             return res.json({product});
-//         } else {
-//             return res.status(200).send('Product not found or not updated.');
-//         }
-//     } catch (error) {
-//         console.error(error);
-//         return res.status(500).send('Internal Server Error');
-//     }
-// };
-
-
 const updateProduct = async (req, res) => {
     try {
+        const newimages = req.files.map(file => {
+            return { url: file.filename };
+        });
         const colors = req.body.prodcolor.split(",");
         const sizes = req.body.sizes;
         const stocks = req.body.stocks;
@@ -205,23 +170,8 @@ const updateProduct = async (req, res) => {
         }
         const id = req.body.id;
 
-        const existingProduct = await Products.findOne({ _id: id });
-
-        // Process new images using sharp
-        for (let file of req.files) {
-            const filepath = file.path;
-            const randomInteger = Math.floor(Math.random() * 20000001);
-            const imageDirectory = path.join(__dirname, "../public/admin/assets/imgs/products");
-            let imgFileName = "cropped" + randomInteger + ".jpg";
-            let imagePath = path.join(imageDirectory, imgFileName);
-            await sharp(filepath)
-                .resize(780, 1000, {
-                    fit: "fill",
-                })
-                .toFile(imagePath);
-            existingProduct.images.push({ url: imgFileName });
-        }
-
+        const existingProduct = await Products.findOne({ _id: id })
+        existingProduct.images = [...existingProduct.images, ...newimages]
         const product = await Products.updateOne(
             { _id: id },
             {
@@ -240,8 +190,9 @@ const updateProduct = async (req, res) => {
             }
         );
 
+
         if (product.modifiedCount > 0) {
-            return res.json({ product });
+            return res.status(200).json({ message: "Product updated successfully.", product });
         } else {
             return res.status(200).send('Product not found or not updated.');
         }
@@ -254,54 +205,58 @@ const updateProduct = async (req, res) => {
 
 
 
-const deleteProduct=async(req,res)=>{
+
+
+
+
+
+const deleteProduct = async (req, res) => {
     try {
         const prodId = req.params.productId;
         const product = await Products.findById(prodId);
-    
+
         if (!product) {
-          return res.status(404).send('User not found');
+            return res.status(404).json({ status: 'error', message: 'Product not found' });
         }
-    
         product.active = !product.active;
         await product.save();
-    
-        res.redirect('/admin/products');
-      } catch (err) {
+        res.status(200).json({ status: 'success', message: 'Product status updated successfully', product });
+    } catch (err) {
         console.error(err);
-        res.status(500).send('Internal Server Error');
-      }
-}
+        res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+    }
+};
 
-var ITEMS_PER_PAGE=5;
 
-const colors=async()=>{
-    try{
-        const products=await Products.distinct("color")
+var ITEMS_PER_PAGE = 5;
+
+const colors = async () => {
+    try {
+        const products = await Products.distinct("color")
         return products
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
     }
 }
 
-const sizes=async()=>{
-    try{
-        const size=['S', 'M', 'L', 'XL', 'XXL'];
-        let newarr=[]
+const sizes = async () => {
+    try {
+        const size = ['S', 'M', 'L', 'XL', 'XXL'];
+        let newarr = []
         const uniqueSizes = await Products.distinct('sizes.size');
-        for(let i=0;i<size.length;i++){
-            if(uniqueSizes.includes(size[i])){
+        for (let i = 0; i < size.length; i++) {
+            if (uniqueSizes.includes(size[i])) {
                 newarr.push(size[i]);
             }
         }
         return newarr;
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
     }
 }
 
-const formatDate=async(date)=>{
-    try{
+const formatDate = async (date) => {
+    try {
         const options = {
             year: 'numeric',
             month: 'long',
@@ -310,30 +265,32 @@ const formatDate=async(date)=>{
             minute: 'numeric',
             hour12: true
         };
-    
+
         return new Intl.DateTimeFormat('en-US', options).format(date);
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
     }
-    
+
 }
 
-const totalQuantity=async(req,res)=>{
-    try{
-        if(!res.locals.user){
+const totalQuantity = async (req, res) => {
+    try {
+        if (!res.locals.user) {
             return null;
         }
-        const user_id=res.locals.user._id
-        const user=await User.findOne({_id:user_id})
-        let sum=0;
-        for(let i=0;i<user.cart.length;i++){
-            sum+=user.cart[i].quantity
-        } 
+        const user_id = res.locals.user._id
+        const user = await User.findOne({ _id: user_id })
+        let sum = 0;
+        for (let i = 0; i < user.cart.length; i++) {
+            sum += user.cart[i].quantity
+        }
         return sum;
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
     }
 }
+
+
 
 
 const loadAllProducts = async (req, res) => {
@@ -345,9 +302,10 @@ const loadAllProducts = async (req, res) => {
     const filterColors = req.query.colors || [];
     const filterSizes = req.query.sizes || [];
 
+    
     try {
-        let user=null;
-        if(res.locals.user){
+        let user = null;
+        if (res.locals.user) {
             user = await User.findOne({ _id: res.locals.user._id });
         }
         const quantity = await totalQuantity(req, res);
@@ -358,22 +316,44 @@ const loadAllProducts = async (req, res) => {
 
         let query = {};
 
+            
         // Apply filters
-        if (filterBrands.length > 0) query.brand = { $in: filterBrands };
-        if (filterCategories.length > 0) query.category = { $in: filterCategories };
-        if (filterColors.length > 0) query.color = { $in: filterColors };
-        if (filterSizes.length > 0) query.size = { $in: filterSizes };
+        if (typeof filterBrands === 'string') {
+            query.brand = { $in: [filterBrands] };
+        } else if (filterBrands.length > 0) {
+            query.brand = {$in:filterBrands}
+        }
+
+        if (typeof filterCategories === 'string') {
+            query.category = { $in: [filterCategories] };
+        } else if (filterCategories.length > 0) {
+            query.category = { $in: filterCategories }
+        }
+
+        if (typeof filterColors === 'string') {
+            query.color = { $in: [filterColors] };
+        } else if (filterColors.length > 0) {
+            query.color = { $in: filterColors }
+        }
+
+        if (typeof filterSizes === 'string') {
+            query.size = { $in: [filterSizes] };
+        } else if (filterSizes.length > 0) {
+            query.size = { $in: filterSizes }
+        }
+   
+
 
         if (searchQuery !== '') {
             query.$or = [
-                { productName: { $regex: new RegExp(`^${searchQuery}`, 'i') } },
-                { brand: { $regex: new RegExp(`^${searchQuery}`, 'i') } },
-                { category: { $regex: new RegExp(`^${searchQuery}`, 'i') } }
+                { productName: { $regex: new RegExp(`${ searchQuery }`, 'i') } },
+                { brand: { $regex: new RegExp(`${searchQuery}`, 'i') } },
+                { category: { $regex: new RegExp(`${searchQuery}`, 'i') } }
             ];
         }
 
         const totalProducts = await Products.find(query).countDocuments();
-        const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
+        const totalPages = totalProducts / totalProducts;
 
         // Apply sorting
         let sortQuery = {};
@@ -381,14 +361,12 @@ const loadAllProducts = async (req, res) => {
             sortQuery = { salePrice: 1 };
         } else if (sortOption === 'priceHighToLow') {
             sortQuery = { salePrice: -1 };
-        } 
+        }
 
         const products = await Products.find(query)
             .sort(sortQuery)
-            .skip((page - 1) * ITEMS_PER_PAGE)
-            .limit(ITEMS_PER_PAGE);
 
-        res.render('allProducts', {
+        res.status(200).json({
             products: products,
             category: category,
             brand: brand,
@@ -404,17 +382,17 @@ const loadAllProducts = async (req, res) => {
             filterBrands: filterBrands,
             filterCategories: filterCategories,
             filterColors: filterColors,
-            filterSizes: filterSizes,
+            filterSizes: filterSizes
         });
     } catch (error) {
         console.log(error.message);
-        res.status(500).render('error', { message: 'Internal Server Error' });
+        res.status(500).json({ message: 'Internal Server Error' });
     }
 };
 
 
 const loadMenProducts = async (req, res) => {
-    
+
     const page = parseInt(req.query.page) || 1;
     const searchQuery = req.query.search || '';
     const sortOption = req.query.sort || 'default'; // Set a default sorting option
@@ -424,8 +402,8 @@ const loadMenProducts = async (req, res) => {
     const filterSizes = req.query.sizes || [];
 
     try {
-        let user=null;
-        if(res.locals.user){
+        let user = null;
+        if (res.locals.user) {
             user = await User.findOne({ _id: res.locals.user._id });
         }
         const quantity = await totalQuantity(req, res);
@@ -435,7 +413,7 @@ const loadMenProducts = async (req, res) => {
         const uniqueSizes = await sizes();
 
         let query = {};
-        query.gender="Male"
+        query.gender = "Male"
         // Apply filters
         if (filterBrands.length > 0) query.brand = { $in: filterBrands };
         if (filterCategories.length > 0) query.category = { $in: filterCategories };
@@ -444,14 +422,14 @@ const loadMenProducts = async (req, res) => {
 
         if (searchQuery !== '') {
             query.$or = [
-                { productName: { $regex: new RegExp(`^${searchQuery}`, 'i') } },
-                { brand: { $regex: new RegExp(`^${searchQuery}`, 'i') } },
-                { category: { $regex: new RegExp(`^${searchQuery}`, 'i') } }
+                { productName: { $regex: new RegExp(`${ searchQuery }`, 'i') } },
+                { brand: { $regex: new RegExp(` ${ searchQuery }`, 'i') } },
+                { category: { $regex: new RegExp(`${ searchQuery }`, 'i') } }
             ];
         }
 
         const totalProducts = await Products.find(query).countDocuments();
-        const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
+        const totalPages = totalProducts / totalProducts;
 
         // Apply sorting
         let sortQuery = {};
@@ -459,14 +437,12 @@ const loadMenProducts = async (req, res) => {
             sortQuery = { salePrice: 1 };
         } else if (sortOption === 'priceHighToLow') {
             sortQuery = { salePrice: -1 };
-        } 
+        }
 
         const products = await Products.find(query)
             .sort(sortQuery)
-            .skip((page - 1) * ITEMS_PER_PAGE)
-            .limit(ITEMS_PER_PAGE);
 
-        res.render('allProducts', {
+        res.status(200).json({
             products: products,
             category: category,
             brand: brand,
@@ -483,6 +459,7 @@ const loadMenProducts = async (req, res) => {
             filterCategories: filterCategories,
             filterColors: filterColors,
             filterSizes: filterSizes,
+           
         });
     } catch (error) {
         console.log(error.message);
@@ -500,8 +477,8 @@ const loadWomenProducts = async (req, res) => {
     const filterSizes = req.query.sizes || [];
 
     try {
-        let user=null;
-        if(res.locals.user){
+        let user = null;
+        if (res.locals.user) {
             user = await User.findOne({ _id: res.locals.user._id });
         }
         const quantity = await totalQuantity(req, res);
@@ -511,7 +488,7 @@ const loadWomenProducts = async (req, res) => {
         const uniqueSizes = await sizes();
 
         let query = {};
-        query.gender="Female"
+        query.gender = "Female"
         // Apply filters
         if (filterBrands.length > 0) query.brand = { $in: filterBrands };
         if (filterCategories.length > 0) query.category = { $in: filterCategories };
@@ -520,14 +497,14 @@ const loadWomenProducts = async (req, res) => {
 
         if (searchQuery !== '') {
             query.$or = [
-                { productName: { $regex: new RegExp(`^${searchQuery}`, 'i') } },
-                { brand: { $regex: new RegExp(`^${searchQuery}`, 'i') } },
-                { category: { $regex: new RegExp(`^${searchQuery}`, 'i') } }
+                { productName: { $regex: new RegExp(`${ searchQuery }`, 'i') } },
+                { brand: { $regex: new RegExp(`${ searchQuery }`, 'i') } },
+                { category: { $regex: new RegExp(` ${ searchQuery }`, 'i') } }
             ];
         }
 
         const totalProducts = await Products.find(query).countDocuments();
-        const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
+        const totalPages = totalProducts / totalProducts;
 
         // Apply sorting
         let sortQuery = {};
@@ -535,15 +512,13 @@ const loadWomenProducts = async (req, res) => {
             sortQuery = { salePrice: 1 };
         } else if (sortOption === 'priceHighToLow') {
             sortQuery = { salePrice: -1 };
-        } 
-        
+        }
+
 
         const products = await Products.find(query)
             .sort(sortQuery)
-            .skip((page - 1) * ITEMS_PER_PAGE)
-            .limit(ITEMS_PER_PAGE);
 
-        res.render('allProducts', {
+        res.status(200).json({
             products: products,
             category: category,
             brand: brand,
@@ -568,37 +543,36 @@ const loadWomenProducts = async (req, res) => {
 };
 
 
-
-const loadProductDetails=async(req,res)=>{
-    try{
-        let user=null;
-        if(res.locals.user){
+const loadProductDetails = async (req, res) => {
+    try {
+        let user = null;
+        if (res.locals.user) {
             user = await User.findOne({ _id: res.locals.user._id });
         }
-        const quantity=await totalQuantity(req,res)
-        const id=req.query.id;
-        const product=await Products.findOne({_id:id});
-        const relatedProducts=await Products.find({category:product.category,gender:product.gender,_id: { $ne: id }});
-        if(product){
-            res.render("product-details",{product:product,userData:user,quantity:quantity,relatedProduct:relatedProducts})
-        }else {
-            res.redirect("/");
+        const quantity = await totalQuantity(req, res)
+        const id = req.query.id;
+        const product = await Products.findOne({ _id: id });
+        const relatedProducts = await Products.find({ category: product.category, gender: product.gender, _id: { $ne: id } });
+        if (product) {
+            res.status(200).json({ product: product, userData: user, quantity: quantity, relatedProduct: relatedProducts })
+        } else {
+            res.status(401).json({message:"Product not found"});
         }
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
         res.status(500).render('error', { message: 'Internal Server Error' });
     }
 }
 
-const submitReview=async(req,res)=>{
-    try{
-        const id=req.query.id;
-        const rating=req.body.rating;
-        const newrating=(rating/5)*100;
-        const d=await formatDate(new Date())
-        const product=await Products.find({_id:id});
-        if(product){
-            const review=await Products.findByIdAndUpdate(id, {
+const submitReview = async (req, res) => {
+    try {
+        const id = req.query.id;
+        const rating = req.body.rating;
+        const newrating = (rating / 5) * 100;
+        const d = await formatDate(new Date())
+        const product = await Products.find({ _id: id });
+        if (product) {
+            const review = await Products.findByIdAndUpdate(id, {
                 $push: {
                     reviews: {
                         name: req.body.name,
@@ -608,66 +582,71 @@ const submitReview=async(req,res)=>{
                     }
                 }
             });
-            if(review){
+            if (review) {
                 // const redirectUrl = '/products?' + new URLSearchParams(id).toString();
-                res.redirect("/products?id="+id);
+                res.redirect("/products?id=" + id);
             }
         }
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
     }
 }
 
 
-const loadSearch=async(req,res)=>{
+const loadSearch = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
-    try{
+    try {
         const user_id = res.locals.user._id;
-        const user=await User.findOne({_id:user_id})
-            const brand=await Brand.find({})
-            const category=await Category.find({})
-            const color=await colors();
-            const uniqueSizes = await sizes();
-            const searchQuery=req.body.searchCriteria
-            const quantity=await totalQuantity(req,res)
-            const searchResults =  await Products.find({ $or: [
+        const user = await User.findOne({ _id: user_id })
+        const brand = await Brand.find({})
+        const category = await Category.find({})
+        const color = await colors();
+        const uniqueSizes = await sizes();
+        const searchQuery = req.body.searchCriteria
+        const quantity = await totalQuantity(req, res)
+        const searchResults = await Products.find({
+            $or: [
                 { productName: { $regex: new RegExp(searchQuery, 'i') } },
                 { category: { $regex: new RegExp(searchQuery, 'i') } },
                 { brand: { $regex: new RegExp(searchQuery, 'i') } }
-              ]}).skip((page - 1) * 8).limit(8);
-              const totalProducts = searchResults.length;
-              const totalPages = Math.ceil(totalProducts / 8);
-              
-            res.render("search.ejs",{
-                quantity:quantity,
-                products:searchResults,
-                category:category,
-                brand:brand,
-                color:color,
-                size:uniqueSizes,
-                currentPage: page,
-                totalPages: totalPages,
-                count:totalProducts,
-                searchQuery:searchQuery,
-            userData:user})
-        
-        
-    }catch(error){
+            ]
+        }).skip((page - 1) * 8).limit(8);
+        const totalProducts = searchResults.length;
+        const totalPages = Math.ceil(totalProducts / 8);
+
+        res.render("search.ejs", {
+            quantity: quantity,
+            products: searchResults,
+            category: category,
+            brand: brand,
+            color: color,
+            size: uniqueSizes,
+            currentPage: page,
+            totalPages: totalPages,
+            count: totalProducts,
+            searchQuery: searchQuery,
+            userData: user
+        })
+
+
+    } catch (error) {
         console.log(error.message);
         res.status(500).render('error', { message: 'Internal Server Error' });
     }
 }
 
 
-const searchFilter=async(req,res)=>{
-    try{
-       console.log("hello");
-        const searchQuery=req.query.search
-        const searchResults =  await Products.find({ $or: [
-            { productName: { $regex: new RegExp(searchQuery, 'i') } },
-            { category: { $regex: new RegExp(searchQuery, 'i') } },
-            { brand: { $regex: new RegExp(searchQuery, 'i') } }
-          ]})
+const searchFilter = async (req, res) => {
+    try {
+        console.log("hello");
+        const searchQuery = req.query.search
+        const searchResults = await Products.find({
+            $or: [
+                { productName: { $regex: new RegExp(searchQuery, 'i') } },
+                { category: { $regex: new RegExp(searchQuery, 'i') } },
+                { brand: { $regex: new RegExp(searchQuery, 'i') } }
+            ]
+        })
 
         const brands = req.body.brands;
         const categories = req.body.categories;
@@ -694,18 +673,20 @@ const searchFilter=async(req,res)=>{
         }
         const combinedQuery = {
             $and: [
-                { $or: [
-                    { productName: { $regex: new RegExp(searchQuery, 'i') } },
-                    { category: { $regex: new RegExp(searchQuery, 'i') } },
-                    { brand: { $regex: new RegExp(searchQuery, 'i') } }
-                ]},
+                {
+                    $or: [
+                        { productName: { $regex: new RegExp(searchQuery, 'i') } },
+                        { category: { $regex: new RegExp(searchQuery, 'i') } },
+                        { brand: { $regex: new RegExp(searchQuery, 'i') } }
+                    ]
+                },
                 query
             ]
         };
 
         const filteredProducts = await Products.find(combinedQuery);
         res.json({ products: filteredProducts });
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
         res.status(500).render('error', { message: 'Internal Server Error' });
     }
@@ -713,7 +694,7 @@ const searchFilter=async(req,res)=>{
 
 
 
-module.exports={
+module.exports = {
     //ADMIN
     loadProducts,
     loadAddProduct,

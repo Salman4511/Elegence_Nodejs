@@ -219,7 +219,7 @@ const loadUsers=async(req,res)=>{
         const userList=await User.find({is_admin:0}).skip((page - 1) * 7).limit(7);
         const totalUsers = await User.find({is_admin:0}).countDocuments();
         const totalPages = Math.ceil(totalUsers / 7);
-        res.render("page-users",{
+        res.status(200).json({
             users:userList,
             currentPage: page,
             totalPages: totalPages
@@ -240,9 +240,9 @@ const blockUser=async(req,res)=>{
         }
     
         user.is_blocked = !user.is_blocked;
-        await user.save();
+        const newuser=await user.save();
     
-        res.redirect('/admin/user_management');
+        res.status(200).json({ message: "User status changed", newuser });
       } catch (err) {
         console.error(err);
         res.status(500).send('Internal Server Error');
@@ -274,7 +274,7 @@ const verifyLogin=async(req,res)=>{
             if(passwordMatch){
                 const token = createToken(adminData._id);
                 res.cookie('jwtAdmin', token, { httpOnly: true, maxAge: maxAge * 1000 });
-                res.redirect("/admin/dashboard");
+                res.status(200).json({adminData,token});
             }else{
                 return res.status(401).render("admin-login", { message: "Invalid credentials!" });
             }
@@ -296,10 +296,10 @@ const changeStatus = async (req, res) => {
         const userData = await User.findOne({ email: email });
 
         if (userData) {
-            await User.updateOne({ email: email }, { $set: { active: false } });
-            res.status(200).send("User status changed successfully");
+            const updateUser=await User.updateOne({ email: email }, { $set: { active: false } });
+            res.status(200).json({ message: "User status changed successfully", updateUser });
         } else {
-            res.status(404).send("User not found");
+            res.status(404).json("User not found");
         }
     } catch (error) {
         console.error("Error changing user status:", error.message);
@@ -341,7 +341,7 @@ const loadSales = async (req, res) => {
                 }
             
             ]);
-            return res.render("salesReport", { sales: salesReport });
+            return res.status(200).json({ sales: salesReport });
         }
     catch (error) {
         console.log(error.message);
@@ -393,7 +393,7 @@ const sortSales = async (req, res) => {
                     }
                 }
             ]);
-            return res.json(salesReport);
+            return res.status(200).json({ sales: salesReport });
         }
     } catch (error) {
         console.log(error.message);

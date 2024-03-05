@@ -92,9 +92,9 @@ admin_route.post("/block/:userId",adminController.blockUser)
 
 //Admin-Brands
 admin_route.get("/brands",validate.requireAuth,brandController.loadBrand)
-admin_route.post("/brands",upload.single('file'),brandController.addBrand)
+admin_route.post("/brands",upload.single('image'),brandController.addBrand)
 admin_route.get("/brands/edit",validate.requireAuth,brandController.loadEditBrand)
-admin_route.put("/brands/edit",upload.single('file'),brandController.updateBrand)
+admin_route.put("/brands/edit",upload.single('image'),brandController.updateBrand)
 admin_route.delete("/brands/delete/:brandId",brandController.deleteBrand)
 
 

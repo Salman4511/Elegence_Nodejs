@@ -14,7 +14,7 @@ const categorySchema=mongoose.Schema({
         type:Number
     },
     expiry:{
-        type:Date
+        type:String
     },
     active:{
         type:Boolean

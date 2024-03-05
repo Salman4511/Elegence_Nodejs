@@ -52,6 +52,10 @@ var otpCode;
 const sendOTP = async (req, res) => {
     try {
         const email = req.body.email;
+        const checkUser = await User.findOne({ email:email });
+        if(checkUser){
+            return res.status(409).json({ "message": "Email already exist" })
+        }
         otpCode = Math.floor(1000 + Math.random() * 9000).toString();
         const transporter = nodemailer.createTransport({
             host: "smtp.gmail.com",
@@ -92,7 +96,7 @@ const verifyOTP = async (req, res) => {
         const enteredOTP = req.body.otp;
         if (enteredOTP === otpCode) {
             verified=true;
-            res.send("Success");
+            res.status(200).json({ message: "Success" });
         } else {
             res.status(400).json({ message: "Invalid OTP" });
         }
@@ -203,7 +207,8 @@ const insertUser=async(req,res)=>{
         const checkEmail=await User.findOne({email:email});
         const checkPhone=await User.findOne({phone:phone});
         if(checkEmail){
-            return res.render("user-register",{message:"Email already exist!"})
+        //     return res.render("user-register",{message:"Email already exist!"})
+            return res.status(409).json({"message":"Email already exist"})
         }else if(checkPhone){
             return res.render("user-register",{message:"Phone already exist!"})
         }
@@ -257,7 +262,7 @@ const insertUser=async(req,res)=>{
                 const token = createToken(userData._id);
                 
                 res.cookie('jwt', token, { httpOnly: true, maxAge: maxAge * 1000 });
-                res.redirect("/");
+                res.status(201).json(userData);
             }else{
             res.redirect("/register")
             }
@@ -307,7 +312,7 @@ const verifyUser = async (req, res) => {
                     const token = createToken(userData._id);
                     req.session.user = userData._id;
                     res.cookie('jwt', token, { httpOnly: true, maxAge: maxAge * 1000 });
-                    return res.redirect("/");
+                    res.status(200).json({userData,token});
                 } else {
                     res.status(403).render("user-login", { message: "Your account has been blocked by the admin." });
                 }
@@ -349,7 +354,7 @@ const loadHome=async(req,res)=>{
 const logoutUser=async(req,res)=>{
     try{
         res.cookie('jwt', '' ,{maxAge : 1})
-        res.redirect('/')
+        return res.status(200).json({"message":"Logout successfully"})
     }catch(error){
         console.log(error.message);
         res.status(500).send("Internal Server Error");
@@ -386,7 +391,7 @@ const loadWishlist = async (req, res) => {
         
         const user = await User.findOne({ _id: user_id });
 
-        res.render("wishlist", { userData: user, products: productsInWishlist, quantity: quantity });
+        res.status(200).json({ userData: user, products: productsInWishlist, quantity: quantity });
     } catch (error) {
         console.log(error.message);
         res.status(500).send("Internal Server Error");
@@ -492,6 +497,7 @@ const moveToBag = async (req, res) => {
             _id: user_id,
             'cart.productId': prodId,
         });
+       
 
         if (existingProduct) {
             await User.updateOne(
@@ -499,8 +505,9 @@ const moveToBag = async (req, res) => {
                 { $pull: { wishlist: { productId: prodId } } }
             );
             console.log('Product removed from wishlist');
-            return res.status(200).redirect("/wishlist");
+            return res.status(200).json({message:"Product moved to bag"});
         } else {
+        
             const product = await Products.findOne({ _id: prodId });
             if (!product) {
                 console.log('Product not found');
@@ -531,7 +538,7 @@ const moveToBag = async (req, res) => {
             
             await Products.updateOne({ _id: prodId, "sizes.size": size }, { $inc: { "sizes.$.stock": -1 } });
             console.log('Product moved to cart and stock decremented');
-            return res.status(200).redirect("/wishlist");
+            return res.status(200).json({message:"Product successfully moved to bag!"});
         }
     } catch (error) {
         console.error('Error:', error);
@@ -549,7 +556,7 @@ const deleteWishlistItem=async(req,res)=>{
         if (user) {
             user.wishlist.pull(req.query.itemId);
             await user.save();
-            res.redirect("/wishlist");
+            res.status(200).json({mesage:"Product Successfully deleted from wishlist!"});
         } else {
             res.status(404).send("User not found"); // Handle the case where the user is not found
         }
@@ -572,8 +579,12 @@ const updateProfile=async(req,res)=>{
                 phone:req.body.profilemobile
             }});
             if(updateData){
-                res.redirect("/my/profile");
+                res.status(200).json({message:"profile updated",updateData});
+            }else{
+                res.status(200).json({ updateData });
             }
+           
+        
         }
     }catch(error){
         console.log(error.message);
@@ -590,7 +601,7 @@ const changePassword=async(req,res)=>{
             password:newpassword
         }})
         if(updatePwd){
-            res.redirect("/my/profile");
+            res.status(200).json({message:"Password updated"});
         }
         
     }catch(error){
@@ -605,16 +616,16 @@ const addAddress=async(req,res)=>{
         const address=await User.updateOne({_id:user_id},{$push:{
             "address":{
                 name:req.body.adname,
-                mobile:req.body.admobile,
+                mobile:parseInt(req.body.admobile),
                 housename:req.body.adhname,
                 area:req.body.adarea,
                 city:req.body.adcity,
                 state:req.body.adstate,
-                pincode:req.body.adpin
+                pincode:parseInt(req.body.adpin)
             }
         }})
         if(address){
-            res.redirect("/my/profile");
+            res.status(200).json({message:"Address added"});
         }
     }catch(error){
         console.log(error.message);
@@ -626,7 +637,7 @@ const editAddress=async(req,res)=>{
     try{
         const quantity=await totalQuantity(req,res)
         const userData=await User.find({"address._id":req.query.addressid})
-        res.render("editAddress",{user:userData,quantity:quantity})
+        res.status(200).json({user:userData,quantity:quantity})
     }catch(error){
         console.log(error.message);
         return res.status(500).json({ message: 'Internal Server Error' }); 
@@ -642,21 +653,21 @@ const updateAddress=async(req,res)=>{
                 {
                     $set: {
                         "address.$.name":req.body.adname,
-                        "address.$.mobile":req.body.admobile,
+                        "address.$.mobile":parseInt(req.body.admobile),
                         "address.$.housename":req.body.adhname,
                         "address.$.area":req.body.adarea,
                         "address.$.city":req.body.adcity,
                         "address.$.state":req.body.adstate,
-                        "address.$.pincode":req.body.adpin
+                        "address.$.pincode":parseInt(req.body.adpin)
                     },
                 },
                 { new: true }
             );
     
             if (user) {
-                res.redirect('/my/profile')
+                res.status(200).json({message:"Address updated",user})
             }else{
-                res.redirect('/my/profile')
+                res.status(200).json({ user })
             }
     
             
@@ -673,7 +684,7 @@ const deleteAddress=async(req,res)=>{
         if (user) {
             user.address.pull(req.query.addressid);
             await user.save();
-            res.redirect("/my/profile");
+            res.status(200).json({message:"Address deleted .."});
         } else {
             res.status(404).send("User not found"); // Handle the case where the user is not found
         }
@@ -689,7 +700,7 @@ const loadChangeEmail=async(req,res)=>{
         const user_id = res.locals.user._id;
         const user = await User.findOne({ _id:user_id });
         const quantity=await totalQuantity(req,res)
-        res.render("changeEmail",{quantity:quantity,userData:user})
+        res.status(200).json({quantity:quantity,userData:user})
     }catch(error){
         console.log(error.message);
         return res.status(500).json({ message: 'Internal Server Error' }); 
@@ -702,12 +713,12 @@ const updateEmail=async(req,res)=>{
         const user_id=res.locals.user._id
         const checkEmail=await User.findOne({email:email});
         if(checkEmail){
-            return res.render("changeEmail",{message:"Email already exist!"})
+            return res.json({message:"Email already exist!"})
         }
         if(verified){
             const updateEmail=await User.findOneAndUpdate({_id:user_id},{$set:{email:email}});
             if(updateEmail){
-                res.redirect("/my/profile");
+                res.status(200).json({message:"Email Updated"});
             }
         }
     }catch(error){
@@ -730,11 +741,11 @@ const loadCart=async(req,res)=>{
             sum+=val;
         }
         if (userData) {
-            res.render('cart', { productsInCart: productsInCart, userData: userData,total:sum,quantity:quantity})
+            res.status(200).json({ productsInCart: productsInCart, userData: userData,total:sum,quantity:quantity})
 
         }
         else {
-            res.redirect('/login')
+            res.status(400).json({message:"Not found"})
         }
 
     } catch (error) {
@@ -761,16 +772,16 @@ const deleteCartItem = async (req, res) => {
                 );
                 user.cart.pull(itemId);
                 await user.save();
-                res.redirect("/cart");
+                res.status(200).json({message:"Item removed from cart"});
             } else {
-                res.status(404).send("Item not found in the cart");
+                res.status(404).json({message:"Item not found in the cart"});
             }
         } else {
-            res.status(404).send("User not found");
+            res.status(404).json({message:"User not found"});
         }
     } catch (error) {
         console.log(error.message);
-        res.status(500).send("Internal Server Error");
+        res.status(500).json({message:"Internal Server Error"});
     }
 };
 
@@ -779,7 +790,7 @@ const updateQuantity = async (req, res) => {
     try {
         const user_id = res.locals.user._id;
         const itemId = req.body.itemId;
-        const operation = req.body.operation;
+        const operation = parseInt(req.body.operation);
         const size=req.body.size;
 
         const user = await User.findOne({ _id: user_id, "cart._id": itemId });
@@ -913,9 +924,9 @@ const addToCart = async (req, res) => {
 };
 
 
-const moveToWishlist=async(req,res)=>{
-    try{
-        const itemId=req.query.itemId;
+const moveToWishlist = async (req, res) => {
+    try {
+        const itemId = req.query.itemId;
         const user_id = res.locals.user._id;
         const user = await User.findOne({ _id: user_id });
         const item = user.cart.find(cartItem => cartItem._id == itemId);
@@ -924,20 +935,21 @@ const moveToWishlist=async(req,res)=>{
         if (!productExists) {
             return res.status(404).json({ message: 'Product not found' });
         }
-        
-        const isAdded=await User.findOne({
+
+        const isAdded = await User.findOne({
             _id: user_id,
             'wishlist.productId': productId
         })
-        if(isAdded){
-                await Products.updateOne(
-                    { _id: productId, "sizes.size": size, "sizes.stock": { $gte: quantity } },
-                    { $inc: { "sizes.$.stock": quantity } }
-                );
-                user.cart.pull(itemId);
-                await user.save();
-                res.redirect("/wishlist");
-        }else{
+
+        if (isAdded) {
+            await Products.updateOne(
+                { _id: productId, "sizes.size": size, "sizes.stock": { $gte: quantity } },
+                { $inc: { "sizes.$.stock": quantity } }
+            );
+            user.cart.pull(itemId);
+            await user.save();
+            return res.status(200).json({ message: 'Product added to wishlist successfully' });
+        } else {
             await User.findOneAndUpdate(
                 { _id: user_id },
                 {
@@ -946,7 +958,7 @@ const moveToWishlist=async(req,res)=>{
                             productId: productId,
                         }
                     }
-                }, 
+                },
                 { new: true }
             );
             await Products.updateOne(
@@ -955,16 +967,15 @@ const moveToWishlist=async(req,res)=>{
             );
             user.cart.pull(itemId);
             await user.save();
-            res.redirect("/wishlist")
+            return res.status(200).json({ message: 'Product added to wishlist successfully' });
         }
-        
 
-        return res.status(200).json({ message: 'Product added to wishlist successfully'});
-
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
+        return res.status(500).json({ message: 'Internal Server Error' });
     }
 }
+
 
 
 const loadAccount=async(req,res)=>{
@@ -973,7 +984,7 @@ const loadAccount=async(req,res)=>{
         const user_id = res.locals.user._id;
         const quantity=await totalQuantity(req,res)
         const user=await User.find({_id:user_id})
-        res.render("profile-details",{userData:user,quantity:quantity})
+        res.status(200).json({userData:user,quantity:quantity})
     }catch(error){
         console.log(error.message);
     }
@@ -985,37 +996,62 @@ const loadEditProfile=async(req,res)=>{
         const user_id = res.locals.user._id;
         const quantity=await totalQuantity(req,res)
         const user=await User.find({_id:user_id})
-        res.render("profile-edit",{userData:user,quantity:quantity})
+        res.status(200).json({userData:user,quantity:quantity})
     }catch(error){
         console.log(error.message);
     }
 }
 
-const loadOrders=async(req,res)=>{
+
+const loadOrders = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
-    try{
+    try {
         const user_id = res.locals.user._id;
-        const quantity=await totalQuantity(req,res)
-        const user=await User.find({_id:user_id})
-        const orders=await Order.find({customerId:user_id}).skip((page - 1) * 10).limit(10);
-        const totalPages = Math.ceil(orders.length/ 10);
-        res.render("profile-orders",{
-            userData:user,
-            quantity:quantity,
-            orders:orders,
+        const quantity = await totalQuantity(req, res);
+        const user = await User.find({ _id: user_id });
+        const orders=await Order.find({customerId:user_id});
+
+        const ordersWithProductDetails = await Promise.all(orders.map(async (order) => {
+            const productDetails = await Promise.all(order.Items.map(async (item) => {
+                try {
+                    const product = await Products.findById(item.productId);
+                    return {
+                        ...item.toObject(),
+                        productDetails: product,
+                    };
+                } catch (error) {
+                    console.error(`Error fetching product with ID ${item.productId}: ${error.message}`);
+                    throw error;
+                }
+            }));
+
+            return {
+                ...order.toObject(),
+                Items: productDetails,
+            };
+        }));
+
+        const totalPages = orders.length/orders.length;
+        res.status(200).json({
+            userData: user,
+            quantity: quantity,
+            orders: ordersWithProductDetails,
             currentPage: page,
-            totalPages: totalPages})
-    }catch(error){
+            totalPages: totalPages,
+        });
+    } catch (error) {
         console.log(error.message);
+        res.status(500).json({ message: "Internal Server Error" });
     }
-}
+};
+
 
 const loadAddress=async(req,res)=>{
     try{
         const user_id = res.locals.user._id;
         const quantity=await totalQuantity(req,res)
         const user=await User.find({_id:user_id})
-        res.render("profile-address",{userData:user,quantity:quantity})
+        res.status(200).json({userData:user,quantity:quantity})
     }catch(error){
         console.log(error.message);
     }
@@ -1026,7 +1062,7 @@ const loadAddAddress=async(req,res)=>{
         const user_id = res.locals.user._id;
         const quantity=await totalQuantity(req,res)
         const user=await User.find({_id:user_id})
-        res.render("profile-addAddress",{userData:user,quantity:quantity})
+        res.status(200).json({userData:user,quantity:quantity})
     }catch(error){
         console.log(error.message);
     }
@@ -1037,7 +1073,7 @@ const loadChangePwd=async(req,res)=>{
         const user_id = res.locals.user._id;
         const quantity=await totalQuantity(req,res)
         const user=await User.find({_id:user_id})
-        res.render("profile-changePwd",{userData:user,quantity:quantity})
+        res.status(200).json({userData:user,quantity:quantity})
     }catch(error){
         console.log(error.message);
     }
@@ -1050,7 +1086,7 @@ const loadWallet=async(req,res)=>{
         const quantity=await totalQuantity(req,res)
         const user=await User.find({_id:user_id})
         const transactionDetails=user[0].transactionDetails
-        res.render("profile-wallet",{userData:user,quantity:quantity,transaction:transactionDetails})
+        res.status(200).json({userData:user,quantity:quantity,transaction:transactionDetails})
     }catch(error){
         console.log(error.message);
     }
@@ -1062,7 +1098,7 @@ const loadCoupons=async(req,res)=>{
         const quantity=await totalQuantity(req,res)
         const user=await User.find({_id:user_id})
         const coupons=await Coupon.find({})
-        res.render("profile-coupons",{userData:user,quantity:quantity,coupons:coupons})
+        res.status(200).json({userData:user,quantity:quantity,coupons:coupons})
     }catch(error){
         console.log(error.message);
     }
@@ -1075,7 +1111,7 @@ const loadReferrals=async(req,res)=>{
         const user=await User.findOne({_id:user_id})
         const code=user.referral_code
         const referrals=await User.find({usedReferral:code})
-        res.render("profile-referrals",{userData:user,quantity:quantity,referrals:referrals})
+        res.status(200).json({userData:user,quantity:quantity,referrals:referrals})
     }catch(error){
         console.log(error.message);
     }

@@ -5,6 +5,7 @@ const express=require("express")
 const app=express()
 
 mongoose.connect("mongodb+srv://naslalellu:IjEHbIdAYLgcPeJW@elegance-db.37x8mgx.mongodb.net/ecom?retryWrites=true&w=majority")
+// mongoose.connect("mongodb://127.0.0.1:27017/ecommerce")
 
 
 

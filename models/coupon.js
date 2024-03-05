@@ -18,7 +18,7 @@ const couponSchema=mongoose.Schema({
         type:Number
     },
     Expiry:{
-        type:Date
+        type: String
     },
     Customers:[{
         type:String

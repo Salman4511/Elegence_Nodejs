@@ -145,7 +145,7 @@ user_route.get("/contact",userController.loadContact)
 
 //Logout
 user_route.post("/logout",userController.logoutUser)
-user_route.get("/logout",validate.requireAuth,validate.isBlocked,userController.logoutUser)
+user_route.get("/logout",validate.requireAuth,userController.logoutUser)
 
 
 

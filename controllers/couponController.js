@@ -5,10 +5,10 @@ const Coupon=require("../models/coupon")
 const loadCoupons = async (req, res) => {
     try {
         const couponData = await Coupon.find({});
-        res.render('coupons', { couponData, couponData });
+        res.status(200).json({ couponData, couponData });
     } catch (error) {
         console.error(error.message);
-        res.status(500).render('error', { message: 'Internal Server Error' });
+        res.status(500).json({ message: 'Internal Server Error' });
     }
 };
 
@@ -17,10 +17,10 @@ const addCoupons = async (req, res) => {
     try {
         const couponcode = req.body.couponcode;
         const couponDescription = req.body.coupondescription;
-        const discount = req.body.discount;
-        const MaximumAmount = req.body.maximumAmount;
-        const MinimumAmount = req.body.minimumAmount;
-        const couponexpiry = req.body.couponexpiry;
+        const discount = parseInt(req.body.discount);
+        const MaximumAmount = parseInt(req.body.maximumAmount);
+        const MinimumAmount = parseInt(req.body.minimumAmount);
+        const couponexpiry = new Date(req.body.couponexpiry);
 
         const coupon = new Coupon({
             MinimumAmount: MinimumAmount,
@@ -34,7 +34,7 @@ const addCoupons = async (req, res) => {
         const success = await coupon.save();
         if (success) {
             couponData = await Coupon.find({});
-            res.status(201).redirect('/admin/coupons');
+            res.status(201).json({message:"Coupon added",couponData});
         } else {
             res.status(500).json({ message: 'Error saving coupon to the database.' });
         }
@@ -71,10 +71,10 @@ const updateCoupon = async (req, res) => {
         const couponId = req.body.couponId;
         const couponcode = req.body.couponcode;
         const couponDescription = req.body.coupondescription;
-        const discount = req.body.discount;
-        const MaximumAmount = req.body.maximumAmount;
-        const MinimumAmount = req.body.minimumAmount;
-        const couponexpiry = req.body.couponexpiry;
+        const discount = parseInt(req.body.discount);
+        const MaximumAmount = parseInt(req.body.maximumAmount);
+        const MinimumAmount = parseInt(req.body.minimumAmount);
+        const couponexpiry = new Date(req.body.couponexpiry);
 
         const coupon = await Coupon.findOne({ _id: couponId });
 
@@ -90,9 +90,10 @@ const updateCoupon = async (req, res) => {
                 }
             });
             if (success.modifiedCount > 0) {
-                res.status(200).json({success});
+                const coupon = await Coupon.findOne({ _id: couponId });
+                res.status(200).json({success,coupon});
             } else {
-                res.status(200).json({ message: 'Coupon not modified.' });
+                res.status(200).json({ message: 'Coupon not modified.'});
             }
         } else {
             res.status(404).json({ message: 'Coupon not found.' });
@@ -112,7 +113,7 @@ const deletecoupon = async (req, res) => {
         const deletecoupon = await Coupon.deleteOne({ _id: couponId });
 
         if (deletecoupon.deletedCount > 0) {
-            res.status(204).redirect("/admin/coupons");
+            res.status(200).json({message:"Coupon deleted!"});
         } else {
             res.status(404).json({ message: "Coupon not found." });
         }
@@ -132,7 +133,8 @@ const deletecoupon = async (req, res) => {
 const applycoupon = async (req, res) => {
     try {
         const user_id = res.locals.user._id;
-        const { couponcode, total } = req.body;
+        const total = parseInt(req.body.total);
+        const couponcode=req.body.couponcode;
         const coupon = await Coupon.findOne({ Code: couponcode });
     
         if (!coupon){

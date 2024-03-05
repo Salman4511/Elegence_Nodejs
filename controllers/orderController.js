@@ -47,15 +47,19 @@ const loadOrderDetails = async (req, res) => {
         const order = await Order.findOne({ _id: orderId });
 
         if (!customer || !products || !order) {
-            return res.status(404).render("error", { message: "Order not found." });
+            return res.status(404).json({ message: "Order not found." });
         }
 
-        res.render("order-details", { order: order, customer: customer, products: products, address: order.Address, quantity: quantity,userData:user });
+        res.status(200).json({ order: order, customer: customer, products: products, address: order.Address, quantity: quantity,userData:user });
     } catch (error) {
         console.error(error.message);
-        res.status(500).render("error", { message: "Internal Server Error" });
+        res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+
+
+
 
 
 
@@ -68,7 +72,7 @@ const cancelOrder = async (req, res) => {
         const order = await Order.findOne({ _id: orderId });
 
         if (!user || !order) {
-            return res.status(404).render("error", { message: "Order not found." });
+            return res.status(404).json({ message: "Order not found." });
         }
 
         const update = await Order.updateOne({ _id: orderId }, { $set: { status: "Cancelled" } });
@@ -104,7 +108,7 @@ const cancelOrder = async (req, res) => {
                 await user.save();
             }
 
-            res.redirect("/order-details?orderId=" + orderId);
+            res.status(200).json({message:"Order Cancelled!",orderId});
         } else {
             return res.status(500).render("error", { message: "Internal Server Error" });
         }
@@ -127,7 +131,7 @@ const returnOrder = async (req, res) => {
         const order = await Order.findOne({ _id: orderId });
 
         if (!user || !order) {
-            return res.status(404).render("error", { message: "Order not found." });
+            return res.status(404).json({ message: "Order not found." });
         }
 
         const updateOrder = await Order.updateOne({ _id: orderId }, {
@@ -137,18 +141,16 @@ const returnOrder = async (req, res) => {
                 returnStatus: "Return requested"
             }
         });
-
-
-        if (updateOrder.modifiedCount > 0) {
+        if(updateOrder.modifiedCount>0) {
             user.wallet = user.wallet + order.totalAmount;
             await user.save();
-            res.redirect("/order-details?orderId=" + orderId);
+            res.status(200).json({message:"Return requested",orderId, updateOrder});
         } else {
-            return res.status(500).render("error", { message: "Failed to request return." });
+            res.status(500).json({ message: "Failed to request return." });
         }
     } catch (error) {
         console.error(error.message);
-        return res.status(500).render("error", { message: "Internal Server Error" });
+        res.status(500).json({ message: "Internal Server Error" });
     }
 };
 
@@ -189,8 +191,8 @@ const orderconfirmation = async (req, res) => {
         var sumdiscount=0;
         const user_id = res.locals.user._id;
         const payment=req.body.paymentMethod
-        const coupondiscount=req.body.discount
-        const categorydiscount=req.body.categorydiscount
+        const coupondiscount=parseInt(req.body.discount)
+        const categorydiscount=parseInt(req.body.categorydiscount)
         if(coupondiscount>0){
             const coupon=await Coupon.findOne({_id:req.session.coupon});
             coupon.Customers.push(user_id);
@@ -200,7 +202,7 @@ const orderconfirmation = async (req, res) => {
         let paymentMethod
         if(payment=="cod"){
             paymentMethod="Cash On Delivery"
-        }else{
+        }else {
             paymentMethod="Razorpay"
         }
 
@@ -318,11 +320,11 @@ const orderconfirmation = async (req, res) => {
         if (paymentMethod ==="Cash On Delivery") {
             await User.updateOne({ _id: user_id }, { $set: { cart: [] } });
             console.log("user selected cash on delivery for order and products deleted from cart");
-            res.json({ codsuccess: true });
+            res.status(200).json({ codsuccess: true });
         } else {
             generateRazorpay(newOrder.orderId, sum - coupondiscount).then((response) => {
                 console.log("razor pay work started:", response);
-                res.json(response);
+                res.status(200).json(response);
             });
         }
         
@@ -340,9 +342,9 @@ const loadConfirm = async (req, res) => {
         const orders=await Order.find({customerId:user_id})
         const orderId=orders[orders.length-1]._id;
         if (userData) {
-            res.render("delivery",{orderId:orderId});
+            res.status(200).json({orderId:orderId});
         } else {
-            res.status(404).render("error", { message: "User not found" });
+            res.status(404).json({ message: "User not found" });
         }
     } catch (error) {
         console.error(error.message);
@@ -393,7 +395,7 @@ const loadCheckout = async (req, res) => {
         if (userData[0].address.length > 0) {
             userData[0].address[0].active = true;
         }
-        res.render("checkout", { productsInCart: productsInCart, userData: userData, total: sum, price: priceArr, quantityy: quantityArr, quantity: quantity,catDiscount:sumdiscount});
+        res.status(200).json({ productsInCart: productsInCart, userData: userData, total: sum, price: priceArr, quantityy: quantityArr, quantity: quantity,catDiscount:sumdiscount});
     } catch (error) {
         console.error(error.message);
         res.status(500).render("error", { message: "Internal Server Error" });
@@ -417,7 +419,7 @@ const selectAddress = async (req, res) => {
                 }
             }
             await user.save();
-            res.json({ message: "Address selected successfully" });
+            res.status(200).json({ message: "Address selected successfully" });
         } else {
             res.json({ error: "User not found" });
         }
@@ -440,16 +442,16 @@ const addCheckoutAddress=async(req,res)=>{
         const address=await User.updateOne({_id:user_id},{$push:{
             "address":{
                 name:req.body.adname,
-                mobile:req.body.admobile,
+                mobile:parseInt(req.body.admobile),
                 housename:req.body.adhname,
                 area:req.body.adarea,
                 city:req.body.adcity,
                 state:req.body.adstate,
-                pincode:req.body.adpin
+                pincode:parseInt(req.body.adpin)
             }
         }})
         if(address){
-            res.redirect("/checkout");
+            res.status(200).json(address);
         } else {
             res.status(500).render("error", { message: "Failed to add address" });
         }
@@ -464,20 +466,37 @@ const addCheckoutAddress=async(req,res)=>{
 
 //ADMIN
 
-const loadOrders=async(req,res)=>{
+// const loadOrders=async(req,res)=>{
+//     const page = parseInt(req.query.page) || 1;
+//     try{
+//         const customer=await Order.find({}).populate('customerId');
+//         const orders=await Order.find({}).skip((page - 1) * 7).limit(7);
+//         const totalOrders = await Order.find({}).countDocuments();
+//         const totalPages = Math.ceil(totalOrders / 7);
+//         res.status(200).json({
+//             orders:orders,
+//             customer:customer,
+//             currentPage: page,
+//             totalPages: totalPages
+//         });
+//     }catch(error){
+//         console.log(error.message);
+//     }
+// }
+const loadOrders = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
-    try{
-        const customer=await Order.find({}).populate('customerId');
-        const orders=await Order.find({}).skip((page - 1) * 7).limit(7);
+    try {
+        const customer = await Order.find({}).populate('customerId');
+        const orders = await Order.find({})
         const totalOrders = await Order.find({}).countDocuments();
-        const totalPages = Math.ceil(totalOrders / 7);
-        res.render("orders",{
-            orders:orders,
-            customer:customer,
+        const totalPages = totalOrders / totalOrders;
+        res.status(200).json({
+            orders: orders,
+            customer: customer,
             currentPage: page,
             totalPages: totalPages
         });
-    }catch(error){
+    } catch (error) {
         console.log(error.message);
     }
 }
@@ -491,8 +510,7 @@ const adminLoadOrderDetails=async(req,res)=>{
             model: 'product' 
         });
         const order=await Order.findOne({_id:orderId});
-       
-        res.render("order-details",{order:order,customer:customer,products:products,address:order.Address})
+        res.status(200).json({order:order,customer:customer,products:products,address:order.Address})
     }catch(error){
         console.log(error.message);
         res.status(500).render("error", { message: "Internal Server Error" });
@@ -504,10 +522,10 @@ const loadEditOrder = async (req, res) => {
         const orderId = req.query.orderId;
         const order = await Order.find({ _id: orderId });
         if (!order) {
-            res.status(404).render("error", { message: "Order not found" });
+            res.status(404).render({ message: "Order not found" });
             return;
         }
-        res.render("editOrder", { order: order });
+        res.status(200).json({ order: order });
     } catch (error) {
         console.error(error.message);
         res.status(500).render("error", { message: "Internal Server Error" });
@@ -557,16 +575,16 @@ const updateOrderStatus = async (req, res) => {
                     status: statusValue,
                     deliveredOn: date
                 }
-            });
-            return res.redirect("/admin/orders");
+            }); 
+            res.status(200).json({ message: "Order status updated", statusValue });
         }
 
         const update = await Order.updateOne({ _id: orderId }, { $set: { status: statusValue } });
 
         if (update.modifiedCount > 0) {
-            res.redirect("/admin/orders");
+            res.status(200).json({message:"Order status updated",update});
         } else {
-            res.status(404).render("error", { message: "Order not found or status updation failed." });
+            res.status(404).json( { message: "Order not found or status updation failed." });
         }
     } catch (error) {
         console.error(error.message);
@@ -605,7 +623,7 @@ const acceptReturn = async (req, res) => {
                 );
 
                 if (!updateProduct.modifiedCount>0) {
-                    return res.status(500).render("error", { message: "Internal Server Error" });
+                    return res.status(500).render({ message: "Internal Server Error" });
                 }
             }
 
@@ -619,16 +637,16 @@ const acceptReturn = async (req, res) => {
             if (updateOrder.modifiedCount > 0) {
                 user.wallet = user.wallet + order.totalAmount;
                 await user.save();
-                return res.redirect("/admin/orders");
+                res.status(200).json({message:"Return accepted"});
             } else {
-                return res.status(500).render("error", { message: "Internal Server Error" });
+                res.status(500).json({ message: "Internal Server Error" });
             }
         } else {
-            return res.status(404).render("error", { message: "Order not found." });
+            return res.status(404).render({ message: "Order not found." });
         }
     } catch (error) {
         console.error(error.message);
-        res.status(500).render("error", { message: "Internal Server Error" });
+        res.status(500).render({ message: "Internal Server Error" });
     }
 };
 
@@ -647,16 +665,16 @@ const rejectReturn = async (req, res) => {
             });
 
             if (updateOrder.modifiedCount > 0) {
-                return res.redirect("/admin/orders");
+                return res.status(200).json({message:"Return Rejected"});
             } else {
-                return res.status(500).render("error", { message: "Internal Server Error" });
+                return res.status(500).json({ message: "Internal Server Error" });
             }
         } else {
-            return res.status(404).render("error", { message: "Order not found." });
+            return res.status(404).json({ message: "Order not found." });
         }
     } catch (error) {
         console.error(error.message);
-        res.status(500).render("error", { message: "Internal Server Error" });
+        res.status(500).json({ message: "Internal Server Error" });
     }
 };
 
