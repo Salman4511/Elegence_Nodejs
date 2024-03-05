@@ -52,6 +52,7 @@ var otpCode;
 const sendOTP = async (req, res) => {
     try {
         const email = req.body.email;
+        console.log("email is ", email);
         const checkUser = await User.findOne({ email:email });
         if(checkUser){
             return res.status(409).json({ "message": "Email already exist" })
